@@ -14,22 +14,39 @@ pub struct HeliosApp {
     system_stats: SystemStats,
     is_processing: bool,
     selected_category: usize,
+    current_time: String,
 }
 
 impl Default for HeliosApp {
     fn default() -> Self {
         Self {
             command_input: CommandInput::default(),
-            output_messages: vec!["HELIOS v0.1.0 initialized.".to_string()],
+            output_messages: vec![
+                "HELIOS v0.1.0 Command System".to_string(),
+                "Type 'help' for available commands".to_string(),
+            ],
             ollama: OllamaClient::default(),
             system_stats: SystemStats::new(),
             is_processing: false,
             selected_category: 0,
+            current_time: "00:00:00".to_string(),
         }
     }
 }
 
 impl HeliosApp {
+    fn update_time(&mut self) {
+        use std::time::SystemTime;
+        let now = SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+        let hours = (now / 3600) % 24;
+        let mins = (now / 60) % 60;
+        let secs = now % 60;
+        self.current_time = format!("{:02}:{:02}:{:02}", hours, mins, secs);
+    }
+
     fn execute_command(&mut self, command: &str) {
         let cmd = command.trim().to_lowercase();
         
@@ -47,12 +64,14 @@ impl HeliosApp {
                 self.output_messages.push("  clear - Clear output".to_string());
                 self.output_messages.push("  ai <prompt> - Ask AI".to_string());
                 self.output_messages.push("  stats - Show system stats".to_string());
+                self.output_messages.push("  time - Show current time".to_string());
             }
             Some("status") => {
                 self.system_stats.refresh();
                 let status = self.system_stats.summary();
                 self.output_messages.push(format!("System: {}", status));
                 self.output_messages.push(format!("AI: {}", if self.ollama.is_available() { "Ready" } else { "Unavailable" }));
+                self.output_messages.push(format!("Time: {}", self.current_time));
             }
             Some("clear") => {
                 self.output_messages.clear();
@@ -61,6 +80,9 @@ impl HeliosApp {
             Some("stats") => {
                 self.system_stats.refresh();
                 self.output_messages.push(self.system_stats.summary());
+            }
+            Some("time") => {
+                self.output_messages.push(format!("Current time: {}", self.current_time));
             }
             Some("ai") => {
                 let prompt = command[2..].trim();
@@ -90,11 +112,17 @@ impl HeliosApp {
 
 impl eframe::App for HeliosApp {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
+        self.update_time();
+        
         egui::CentralPanel::default().show_inside(ui, |ui| {
             ui.columns(3, |columns| {
                 columns[0].vertical(|ui| {
-                    ui.heading("COMMANDS");
+                    ui.add_space(10.0);
+                    ui.heading("HELIOS");
+                    ui.label("v0.1.0");
                     ui.separator();
+                    ui.add_space(5.0);
+                    
                     let categories = ["System", "AI", "Files", "Network", "Settings"];
                     for (i, cat) in categories.iter().enumerate() {
                         if ui.selectable_label(self.selected_category == i, *cat).clicked() {
@@ -104,11 +132,14 @@ impl eframe::App for HeliosApp {
                 });
 
                 columns[1].vertical(|ui| {
-                    ui.heading("INPUT");
+                    ui.add_space(10.0);
+                    ui.heading("COMMAND INPUT");
                     ui.separator();
+                    ui.add_space(5.0);
                     
-                    let text_edit = ui.text_edit_singleline(&mut self.command_input.current);
-                    if text_edit.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)) {
+                    ui.text_edit_singleline(&mut self.command_input.current);
+                    
+                    if ui.input(|i| i.key_pressed(egui::Key::Enter)) {
                         let cmd = self.command_input.current.clone();
                         if !cmd.is_empty() {
                             self.command_input.push_command(cmd.clone());
@@ -122,30 +153,9 @@ impl eframe::App for HeliosApp {
                     if ui.input(|i| i.key_pressed(egui::Key::ArrowDown)) {
                         self.command_input.navigate_history_down();
                     }
-                    
-                    if ui.input(|i| i.key_pressed(egui::Key::Tab)) {
-                        self.command_input.apply_selected_suggestion();
-                    }
 
-                    if !self.command_input.suggestions.is_empty() {
-                        ui.separator();
-                        let suggestions = self.command_input.suggestions.clone();
-                        let selected = self.command_input.selected_suggestion;
-                        for (i, suggestion) in suggestions.iter().enumerate() {
-                            let is_selected = Some(i) == selected;
-                            let label = if is_selected {
-                                ui.label(format!("> {}", suggestion))
-                            } else {
-                                ui.label(suggestion.clone())
-                            };
-                            if label.interact(egui::Sense::click()).clicked() {
-                                self.command_input.current = suggestion.clone();
-                                self.command_input.suggestions.clear();
-                            }
-                        }
-                    }
-
-                    if ui.button("EXECUTE").clicked() {
+                    let btn_text = if self.is_processing { "PROCESSING..." } else { "EXECUTE" };
+                    if ui.button(btn_text).clicked() {
                         let cmd = self.command_input.current.clone();
                         if !cmd.is_empty() {
                             self.command_input.push_command(cmd.clone());
@@ -157,7 +167,7 @@ impl eframe::App for HeliosApp {
                     ui.heading("OUTPUT");
                     ui.separator();
                     
-                    egui::ScrollArea::vertical().show(ui, |ui| {
+                    egui::ScrollArea::vertical().stick_to_bottom(true).show(ui, |ui| {
                         for msg in &self.output_messages {
                             ui.label(msg);
                         }
@@ -165,13 +175,29 @@ impl eframe::App for HeliosApp {
                 });
 
                 columns[2].vertical(|ui| {
-                    ui.heading("STATUS");
+                    ui.add_space(10.0);
+                    ui.heading("SYSTEM STATUS");
                     ui.separator();
+                    ui.add_space(10.0);
+                    
                     self.system_stats.refresh();
+                    
                     ui.label(format!("CPU: {:.1}%", self.system_stats.cpu_usage()));
-                    ui.label(format!("RAM: {}MB / {}MB", self.system_stats.memory_used_mb(), self.system_stats.memory_total_mb()));
-                    ui.label(format!("AI: {}", if self.ollama.is_available() { "Ready" } else { "Offline" }));
+                    ui.label(format!("Memory: {} / {} MB", self.system_stats.memory_used_mb(), self.system_stats.memory_total_mb()));
+                    ui.add(egui::ProgressBar::new(self.system_stats.memory_percent() / 100.0).desired_width(150.0));
+                    
+                    ui.separator();
+                    ui.add_space(5.0);
+                    
+                    ui.label("AI ENGINE:");
+                    let ai_status = if self.ollama.is_available() { "ONLINE" } else { "OFFLINE" };
+                    ui.label(ai_status);
+                    
+                    ui.separator();
+                    ui.add_space(5.0);
+                    
                     ui.label(format!("Host: {}", self.system_stats.hostname()));
+                    ui.label(format!("Time: {}", self.current_time));
                 });
             });
         });
