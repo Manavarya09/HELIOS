@@ -1,0 +1,9 @@
+[package]
+name = "masyv-core"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+eframe = "0.34"
+egui = "0.34"
+console_error_panic_hook = "0.1"

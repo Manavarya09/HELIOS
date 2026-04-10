@@ -1,0 +1,16 @@
+target/
+Cargo.lock
+*.pdb
+*.exe
+*.dll
+*.so
+*.dylib
+build.bat
+link.bat
+link.ps1
+.DS_Store
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
