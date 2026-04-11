@@ -1,7 +1,7 @@
 use sysinfo::System;
 
 pub struct SystemStats {
-    system: System,
+    pub system: System,
 }
 
 impl Default for SystemStats {
