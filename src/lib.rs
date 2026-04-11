@@ -1,11 +1,13 @@
 mod ai;
 mod commands;
+mod config;
 mod system;
 mod ui;
 
 use ai::{AiProvider, OllamaClient};
 use commands::CommandInput;
 use commands::{parse_file_command, parse_network_command, parse_system_command};
+use config::AppConfig;
 use eframe::egui;
 use system::SystemStats;
 use ui::{Theme, UiState};
@@ -19,10 +21,12 @@ pub struct HeliosApp {
     selected_category: usize,
     current_time: String,
     ui_state: UiState,
+    config: AppConfig,
 }
 
 impl Default for HeliosApp {
     fn default() -> Self {
+        let config = AppConfig::load();
         Self {
             command_input: CommandInput::default(),
             output_messages: vec![
@@ -35,6 +39,7 @@ impl Default for HeliosApp {
             selected_category: 0,
             current_time: "00:00:00".to_string(),
             ui_state: UiState::default(),
+            config: AppConfig::load(),
         }
     }
 }
@@ -128,6 +133,18 @@ impl HeliosApp {
                     .push("  theme next - Next theme".to_string());
                 self.output_messages
                     .push("  shortcuts - Toggle shortcuts overlay".to_string());
+                self.output_messages.push("".to_string());
+                self.output_messages.push("=== Settings ===".to_string());
+                self.output_messages
+                    .push("  config list - List all settings".to_string());
+                self.output_messages
+                    .push("  config get <key> - Get setting value".to_string());
+                self.output_messages
+                    .push("  config set <key> <value> - Set setting".to_string());
+                self.output_messages
+                    .push("  config save - Save config to file".to_string());
+                self.output_messages
+                    .push("  config reset - Reset to defaults".to_string());
                 self.output_messages.push("".to_string());
                 self.output_messages
                     .push("Press ? for shortcuts, T to cycle theme".to_string());
@@ -345,6 +362,75 @@ impl HeliosApp {
                 } else {
                     "Shortcuts overlay disabled.".to_string()
                 });
+            }
+            Some(&"config") => {
+                let args: Vec<&str> = parts[1..].iter().copied().collect();
+                if args.is_empty() || args[0] == "list" {
+                    self.output_messages.push("Current Settings:".to_string());
+                    for (key, value) in self.config.list_all() {
+                        self.output_messages.push(format!("  {} = {}", key, value));
+                    }
+                } else if args[0] == "get" {
+                    if args.len() < 2 {
+                        self.output_messages
+                            .push("Usage: config get <key>".to_string());
+                    } else {
+                        match self.config.get(args[1]) {
+                            Some(value) => self
+                                .output_messages
+                                .push(format!("{} = {}", args[1], value)),
+                            None => self
+                                .output_messages
+                                .push(format!("Unknown key: {}", args[1])),
+                        }
+                    }
+                } else if args[0] == "set" {
+                    if args.len() < 3 {
+                        self.output_messages
+                            .push("Usage: config set <key> <value>".to_string());
+                    } else {
+                        let key = args[1];
+                        let value = args[2..].join(" ");
+                        match self.config.set(key, &value) {
+                            Ok(()) => {
+                                self.output_messages
+                                    .push(format!("Set {} = {}", key, value));
+                                if self.config.general.auto_save {
+                                    if let Err(e) = self.config.save() {
+                                        self.output_messages
+                                            .push(format!("Warning: Failed to save config: {}", e));
+                                    } else {
+                                        self.output_messages.push("Config saved.".to_string());
+                                    }
+                                }
+                            }
+                            Err(e) => self.output_messages.push(format!("Error: {}", e)),
+                        }
+                    }
+                } else if args[0] == "save" {
+                    match self.config.save() {
+                        Ok(()) => self
+                            .output_messages
+                            .push("Config saved successfully.".to_string()),
+                        Err(e) => self
+                            .output_messages
+                            .push(format!("Error saving config: {}", e)),
+                    }
+                } else if args[0] == "reset" {
+                    self.config = AppConfig::default();
+                    match self.config.save() {
+                        Ok(()) => self
+                            .output_messages
+                            .push("Config reset to defaults and saved.".to_string()),
+                        Err(e) => self
+                            .output_messages
+                            .push(format!("Error saving config: {}", e)),
+                    }
+                } else {
+                    self.output_messages.push(
+                        "Usage: config [list|get <key>|set <key> <value>|save|reset]".to_string(),
+                    );
+                }
             }
             _ => {
                 self.output_messages.push(format!(
