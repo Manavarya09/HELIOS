@@ -1,6 +1,7 @@
 mod ai;
 mod commands;
 mod config;
+mod plugins;
 mod system;
 mod ui;
 
@@ -9,6 +10,7 @@ use commands::CommandInput;
 use commands::{parse_file_command, parse_network_command, parse_system_command};
 use config::AppConfig;
 use eframe::egui;
+use plugins::{PluginRegistry, FileManagerPlugin, NetworkToolsPlugin, ProcessManagerPlugin};
 use system::SystemStats;
 use ui::{Theme, UiState};
 
@@ -22,11 +24,18 @@ pub struct HeliosApp {
     current_time: String,
     ui_state: UiState,
     config: AppConfig,
+    plugin_registry: PluginRegistry,
 }
 
 impl Default for HeliosApp {
     fn default() -> Self {
         let config = AppConfig::load();
+        let mut plugin_registry = PluginRegistry::new();
+        
+        let _ = plugin_registry.register(Box::new(FileManagerPlugin::new()));
+        let _ = plugin_registry.register(Box::new(NetworkToolsPlugin::new()));
+        let _ = plugin_registry.register(Box::new(ProcessManagerPlugin::new()));
+        
         Self {
             command_input: CommandInput::default(),
             output_messages: vec![
@@ -40,6 +49,7 @@ impl Default for HeliosApp {
             current_time: "00:00:00".to_string(),
             ui_state: UiState::default(),
             config: AppConfig::load(),
+            plugin_registry,
         }
     }
 }
@@ -430,6 +440,56 @@ impl HeliosApp {
                     self.output_messages.push(
                         "Usage: config [list|get <key>|set <key> <value>|save|reset]".to_string(),
                     );
+                }
+            }
+            Some(&"plugins") | Some(&"plugin") => {
+                let args: Vec<&str> = parts[1..].iter().copied().collect();
+                if args.is_empty() || args[0] == "list" {
+                    self.output_messages.push("Loaded Plugins:".to_string());
+                    let plugins = self.plugin_registry.list();
+                    if plugins.is_empty() {
+                        self.output_messages.push("  No plugins loaded.".to_string());
+                    } else {
+                        for p in plugins {
+                            self.output_messages.push(format!("  {} v{} - {}", p.name, p.version, p.description));
+                            self.output_messages.push(format!("    Commands: {:?}", p.commands));
+                        }
+                    }
+                } else if args[0] == "info" {
+                    if args.len() < 2 {
+                        self.output_messages.push("Usage: plugin info <name>".to_string());
+                    } else {
+                        if let Some(p) = self.plugin_registry.get(args[1]) {
+                            let info = p.info();
+                            self.output_messages.push(format!("Plugin: {}", info.name));
+                            self.output_messages.push(format!("Version: {}", info.version));
+                            self.output_messages.push(format!("Description: {}", info.description));
+                            self.output_messages.push(format!("Commands: {:?}", info.commands));
+                        } else {
+                            self.output_messages.push(format!("Plugin '{}' not found", args[1]));
+                        }
+                    }
+                } else if args[0] == "run" {
+                    if args.len() < 3 {
+                        self.output_messages.push("Usage: plugin run <name> <command> [args...]".to_string());
+                    } else {
+                        let plugin_name = args[1];
+                        let plugin_cmd = args[2];
+                        let plugin_args: Vec<&str> = args[3..].iter().copied().collect();
+                        match self.plugin_registry.execute(plugin_name, plugin_cmd, &plugin_args) {
+                            Ok(result) => self.output_messages.push(result),
+                            Err(e) => self.output_messages.push(format!("Error: {}", e)),
+                        }
+                    }
+                } else if args[0] == "commands" {
+                    self.output_messages.push("Available Plugin Commands:".to_string());
+                    for (name, cmds) in self.plugin_registry.commands() {
+                        for cmd in cmds {
+                            self.output_messages.push(format!("  {} - {}", cmd, name));
+                        }
+                    }
+                } else {
+                    self.output_messages.push("Usage: plugin [list|info <name>|run <name> <command>|commands]".to_string());
                 }
             }
             _ => {
