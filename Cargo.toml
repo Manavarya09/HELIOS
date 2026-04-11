@@ -1,6 +1,7 @@
 [package]
 name = "masyv-core"
-version = "0.1.0"
+version = "0.2.0"
+description = "HELIOS - A modern command system with AI integration"
 edition = "2024"
 
 [dependencies]

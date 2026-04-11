@@ -29,7 +29,7 @@ pub struct HeliosApp {
 
 impl Default for HeliosApp {
     fn default() -> Self {
-        let config = AppConfig::load();
+        let _config = AppConfig::load();
         let mut plugin_registry = PluginRegistry::new();
         
         let _ = plugin_registry.register(Box::new(FileManagerPlugin::new()));
