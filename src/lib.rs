@@ -2,7 +2,7 @@ mod ai;
 mod commands;
 mod system;
 
-use ai::OllamaClient;
+use ai::{AiProvider, OllamaClient};
 use commands::CommandInput;
 use commands::{parse_file_command, parse_network_command, parse_system_command};
 use eframe::egui;
@@ -143,13 +143,96 @@ impl HeliosApp {
                     .push(format!("Current time: {}", self.current_time));
             }
             Some(&"ai") => {
-                let prompt = command[2..].trim();
-                if prompt.is_empty() {
-                    self.output_messages.push("Usage: ai <prompt>".to_string());
+                let args: Vec<&str> = parts[1..].iter().copied().collect();
+                if args.is_empty() {
+                    self.output_messages
+                        .push("Usage: ai <prompt> | ai config <key> <value>".to_string());
+                    self.output_messages
+                        .push("  ai <prompt> - Ask AI".to_string());
+                    self.output_messages
+                        .push("  ai chat - Start chat mode".to_string());
+                    self.output_messages
+                        .push("  ai clear - Clear chat history".to_string());
+                    self.output_messages
+                        .push("  ai history - Show chat history".to_string());
+                    self.output_messages
+                        .push("  ai config - Show AI config".to_string());
+                    self.output_messages.push(
+                        "  ai provider <name> - Set provider (ollama/openai/anthropic)".to_string(),
+                    );
+                    self.output_messages
+                        .push("  ai model <name> - Set model".to_string());
+                } else if args[0] == "config" {
+                    self.output_messages
+                        .push(format!("AI Config: {:?}", self.ollama.config()));
+                } else if args[0] == "provider" {
+                    if args.len() < 2 {
+                        self.output_messages
+                            .push("Usage: ai provider <ollama|openai|anthropic>".to_string());
+                    } else {
+                        match args[1].to_lowercase().as_str() {
+                            "ollama" => {
+                                self.ollama.set_provider(AiProvider::Ollama);
+                                self.output_messages
+                                    .push("Provider set to Ollama".to_string());
+                            }
+                            "openai" => {
+                                self.ollama.set_provider(AiProvider::OpenAI);
+                                self.output_messages
+                                    .push("Provider set to OpenAI".to_string());
+                            }
+                            "anthropic" => {
+                                self.ollama.set_provider(AiProvider::Anthropic);
+                                self.output_messages
+                                    .push("Provider set to Anthropic".to_string());
+                            }
+                            _ => self.output_messages.push(
+                                "Unknown provider. Use: ollama, openai, or anthropic".to_string(),
+                            ),
+                        }
+                    }
+                } else if args[0] == "model" {
+                    if args.len() < 2 {
+                        self.output_messages
+                            .push("Usage: ai model <model_name>".to_string());
+                    } else {
+                        self.ollama.set_model(args[1].to_string());
+                        self.output_messages
+                            .push(format!("Model set to: {}", args[1]));
+                    }
+                } else if args[0] == "apikey" {
+                    if args.len() < 2 {
+                        self.output_messages
+                            .push("Usage: ai apikey <key>".to_string());
+                    } else {
+                        self.ollama.set_api_key(args[1].to_string());
+                        self.output_messages.push("API key set".to_string());
+                    }
+                } else if args[0] == "chat" {
+                    self.output_messages.push(
+                        "Chat mode not yet implemented. Use 'ai <prompt>' for single queries."
+                            .to_string(),
+                    );
+                } else if args[0] == "clear" {
+                    self.ollama.clear_history();
+                    self.output_messages
+                        .push("Chat history cleared.".to_string());
+                } else if args[0] == "history" {
+                    let history = self.ollama.history();
+                    if history.is_empty() {
+                        self.output_messages.push("No chat history.".to_string());
+                    } else {
+                        self.output_messages.push("Chat History:".to_string());
+                        for msg in history {
+                            self.output_messages
+                                .push(format!("[{}] {}", msg.role, msg.content));
+                        }
+                    }
                 } else {
+                    let prompt = args.join(" ");
                     self.output_messages.push("Processing...".to_string());
                     self.is_processing = true;
-                    match self.ollama.generate(prompt.to_string()) {
+                    match self.ollama.generate(prompt) {
                         Ok(response) => {
                             self.output_messages.push("AI:".to_string());
                             self.output_messages.push(response);
