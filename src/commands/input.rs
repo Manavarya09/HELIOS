@@ -81,9 +81,22 @@ impl CommandInput {
         }
 
         let commands = vec![
-            "help", "status", "clear", "ai ", "run ", "open ", "close ",
-            "system info", "system stats", "network scan", "files list",
-            "settings", "execute ", "search ", "ping ", "curl ",
+            "help",
+            "status",
+            "clear",
+            "ai ",
+            "run ",
+            "open ",
+            "close ",
+            "system info",
+            "system stats",
+            "network scan",
+            "files list",
+            "settings",
+            "execute ",
+            "search ",
+            "ping ",
+            "curl ",
         ];
 
         self.suggestions = commands
@@ -91,7 +104,7 @@ impl CommandInput {
             .filter(|c| c.starts_with(&self.current.to_lowercase()))
             .map(|c| c.to_string())
             .collect();
-        
+
         if !self.suggestions.is_empty() {
             self.selected_suggestion = Some(0);
         }
