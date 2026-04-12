@@ -1181,10 +1181,7 @@ impl eframe::App for HeliosApp {
                     .show(ui.ctx(), |ui| {
                         egui::Frame::default()
                             .fill(egui::Color32::from_gray(20))
-                            .stroke(egui::Stroke::new(
-                                2.0,
-                                egui::Color32::from_rgb(100, 150, 255),
-                            ))
+                            .stroke(egui::Stroke::new(2.0, egui::Color32::from_rgb(0, 255, 200)))
                             .show(ui, |ui| {
                                 ui.heading("Keyboard Shortcuts");
                                 ui.separator();
@@ -1202,219 +1199,386 @@ impl eframe::App for HeliosApp {
             }
 
             ui.columns(4, |columns| {
-                // PANEL 1 - Navigation & Quick Stats
                 columns[0].vertical(|ui| {
-                    ui.add_space(5.0);
+                    ui.add_space(10.0);
 
-                    // Logo Area
-                    ui.heading("HELIOS");
-                    ui.label("v0.3.0 | Jarvis Core");
-                    ui.separator();
+                    let neon_cyan = egui::Color32::from_rgb(0, 255, 200);
+                    let neon_pink = egui::Color32::from_rgb(255, 0, 128);
+                    let dark_bg = egui::Color32::from_rgb(15, 15, 30);
 
-                    // Navigation
-                    let categories = ["MAIN", "AI", "FILES", "NETWORK", "SYSTEM", "CONFIG"];
-                    for (i, cat) in categories.iter().enumerate() {
-                        let selected = self.selected_category == i;
-                        ui.add_space(3.0);
-                        if ui.selectable_label(selected, *cat).clicked() {
-                            self.selected_category = i;
-                        }
-                    }
+                    egui::Frame::default()
+                        .fill(dark_bg)
+                        .stroke(egui::Stroke::new(2.0, neon_cyan))
+                        .corner_radius(8.0)
+                        .show(ui, |ui| {
+                            ui.add_space(10.0);
+                            ui.heading("HELIOS");
+                            ui.colored_label(neon_cyan, "v0.4.0 | JARVIS CORE");
+                            ui.separator();
+
+                            let categories = [
+                                ("MAIN", true),
+                                ("AI ENGINE", false),
+                                ("FILES", false),
+                                ("NETWORK", false),
+                                ("SYSTEM", false),
+                                ("CONFIG", false),
+                            ];
+                            for (cat, active) in categories.iter() {
+                                let selected = self.selected_category
+                                    == categories.iter().position(|(s, _)| s == cat).unwrap_or(0);
+                                ui.add_space(5.0);
+                                if *active {
+                                    ui.colored_label(neon_cyan, format!("> {}", cat));
+                                } else if ui.selectable_label(selected, *cat).clicked() {
+                                    self.selected_category =
+                                        categories.iter().position(|(s, _)| s == cat).unwrap_or(0);
+                                }
+                            }
+                        });
 
                     ui.add_space(15.0);
-                    ui.separator();
 
-                    // Quick Stats
-                    ui.label("QUICK STATS");
-                    ui.add_space(5.0);
-                    self.system_stats.refresh();
-                    ui.label(format!("CPU: {:.0}%", self.system_stats.cpu_usage()));
-                    ui.label(format!("MEM: {:.0}%", self.system_stats.memory_percent()));
-                    ui.label(format!(
-                        "PROCS: {}",
-                        self.system_stats.system.processes().len()
-                    ));
-                    ui.label(format!("UPTIME: {}", self.system_stats.uptime()));
-                });
-
-                // PANEL 2 - Realtime Graphs
-                columns[1].vertical(|ui| {
-                    ui.add_space(5.0);
-                    ui.heading("REAL-TIME METRICS");
-                    ui.separator();
-                    ui.add_space(5.0);
-
-                    // CPU Graph
-                    ui.label("CPU LOAD");
-                    let cpu_data = self.realtime_graphs.cpu.get_normalized();
-                    for (i, &val) in cpu_data.iter().take(30).enumerate() {
-                        let bar_height = (val * 20.0) as usize;
-                        let color = if val > 0.8 {
-                            egui::Color32::RED
-                        } else if val > 0.5 {
-                            egui::Color32::YELLOW
-                        } else {
-                            egui::Color32::from_rgb(0, 200, 150)
-                        };
-                        ui.colored_label(color, "█".repeat(bar_height + 1));
-                    }
-                    ui.label(format!("{:.1}%", self.jarvis.processing_load));
-
-                    ui.add_space(10.0);
-
-                    // Memory Graph
-                    ui.label("MEMORY USAGE");
-                    let mem_data = self.realtime_graphs.memory.get_normalized();
-                    for (i, &val) in mem_data.iter().take(30).enumerate() {
-                        let bar_height = (val * 20.0) as usize;
-                        let color = if val > 0.9 {
-                            egui::Color32::RED
-                        } else if val > 0.7 {
-                            egui::Color32::YELLOW
-                        } else {
-                            egui::Color32::from_rgb(100, 100, 255)
-                        };
-                        ui.colored_label(color, "█".repeat(bar_height + 1));
-                    }
-                    ui.label(format!("{:.1}%", self.jarvis.memory_usage));
-
-                    ui.add_space(10.0);
-
-                    // Network Graph
-                    ui.label("NETWORK ACTIVITY");
-                    let net_data = self.realtime_graphs.network.get_normalized();
-                    for (i, &val) in net_data.iter().take(30).enumerate() {
-                        let bar_height = (val * 20.0) as usize;
-                        ui.colored_label(
-                            egui::Color32::from_rgb(255, 100, 50),
-                            "█".repeat(bar_height + 1),
-                        );
-                    }
-                    ui.label(format!("{:.1}%", self.jarvis.network_activity));
-
-                    ui.add_space(10.0);
-
-                    // Power Graph
-                    ui.label("POWER CONSUMPTION");
-                    let power_data = self.realtime_graphs.power.get_normalized();
-                    for (i, &val) in power_data.iter().take(30).enumerate() {
-                        let bar_height = (val * 20.0) as usize;
-                        ui.colored_label(
-                            egui::Color32::from_rgb(255, 200, 0),
-                            "█".repeat(bar_height + 1),
-                        );
-                    }
-                    ui.label(format!("{:.1}%", self.jarvis.power_consumption));
-                });
-
-                // PANEL 3 - System Status & JARVIS
-                columns[2].vertical(|ui| {
-                    ui.add_space(5.0);
-                    ui.heading("SYSTEM STATUS");
-                    ui.separator();
-                    ui.add_space(5.0);
-
-                    // JARVIS Status
-                    ui.colored_label(egui::Color32::from_rgb(0, 255, 200), "● JARVIS ACTIVE");
-                    ui.add_space(3.0);
-                    ui.label(format!("MODE: {}", self.jarvis.system_mode));
-                    ui.label(format!("THREAT: {}", self.jarvis.threat_level));
-                    ui.label(format!("SECURITY: {}", self.jarvis.security_status));
-
-                    ui.separator();
-                    ui.add_space(5.0);
-
-                    // Gauges
-                    ui.label("CORE TEMPERATURE");
-                    ui.add(
-                        egui::ProgressBar::new(self.jarvis.core_temp / 100.0).desired_width(180.0),
-                    );
-                    ui.label(format!("{:.1}°C", self.jarvis.core_temp));
-
-                    ui.add_space(8.0);
-                    ui.label("PROCESSING LOAD");
-                    ui.add(
-                        egui::ProgressBar::new(self.jarvis.processing_load / 100.0)
-                            .desired_width(180.0),
-                    );
-                    ui.label(format!("{:.1}%", self.jarvis.processing_load));
-
-                    ui.add_space(8.0);
-                    ui.label("AI ENGINE");
-                    let ai_online = self.ollama.is_available();
-                    ui.colored_label(
-                        if ai_online {
-                            egui::Color32::GREEN
-                        } else {
-                            egui::Color32::RED
-                        },
-                        if ai_online {
-                            "● ONLINE"
-                        } else {
-                            "○ OFFLINE"
-                        },
-                    );
-
-                    ui.separator();
-                    ui.add_space(5.0);
-                    ui.label("ALERTS");
-                    if self.alert_manager.alerts.is_empty() {
-                        ui.label("No active alerts");
-                    } else {
-                        for alert in self.alert_manager.alerts.iter().take(5) {
-                            let color = match alert.level {
-                                ui::AlertLevel::Critical => egui::Color32::RED,
-                                ui::AlertLevel::Warning => egui::Color32::YELLOW,
-                                ui::AlertLevel::Info => egui::Color32::LIGHT_BLUE,
-                            };
-                            ui.colored_label(color, &alert.message);
-                        }
-                    }
-                });
-
-                // PANEL 4 - Command Input
-                columns[3].vertical(|ui| {
-                    ui.add_space(5.0);
-                    ui.heading("COMMAND CONSOLE");
-                    ui.separator();
-                    ui.add_space(5.0);
-
-                    ui.horizontal(|ui| {
-                        ui.label(">");
-                        ui.text_edit_singleline(&mut self.command_input.current);
-                    });
-
-                    if ui.input(|i| i.key_pressed(egui::Key::Enter)) {
-                        let cmd = self.command_input.current.clone();
-                        if !cmd.is_empty() {
-                            self.command_input.push_command(cmd.clone());
-                            self.execute_command(&cmd);
-                        }
-                    }
-
-                    if ui.input(|i| i.key_pressed(egui::Key::ArrowUp)) {
-                        self.command_input.navigate_history_up();
-                    }
-                    if ui.input(|i| i.key_pressed(egui::Key::ArrowDown)) {
-                        self.command_input.navigate_history_down();
-                    }
-
-                    ui.add_space(5.0);
-                    if ui.button("EXECUTE").clicked() {
-                        let cmd = self.command_input.current.clone();
-                        if !cmd.is_empty() {
-                            self.command_input.push_command(cmd.clone());
-                            self.execute_command(&cmd);
-                        }
-                    }
-
-                    ui.separator();
-                    egui::ScrollArea::vertical()
-                        .stick_to_bottom(true)
+                    egui::Frame::default()
+                        .fill(dark_bg)
+                        .stroke(egui::Stroke::new(1.5, neon_pink))
+                        .corner_radius(8.0)
                         .show(ui, |ui| {
-                            for msg in &self.output_messages {
-                                ui.label(msg);
+                            ui.add_space(10.0);
+                            ui.colored_label(egui::Color32::GOLD, "SYSTEM METRICS");
+                            ui.separator();
+                            ui.add_space(5.0);
+
+                            self.system_stats.refresh();
+                            let cpu = self.system_stats.cpu_usage();
+                            let mem = self.system_stats.memory_percent();
+
+                            ui.label(format!("CPU: {:.0}%", cpu));
+                            ui.add(
+                                egui::ProgressBar::new(cpu / 100.0)
+                                    .desired_width(120.0)
+                                    .fill(egui::Color32::from_rgb(0, 255, 200)),
+                            );
+
+                            ui.add_space(8.0);
+                            ui.label(format!("MEM: {:.0}%", mem));
+                            ui.add(
+                                egui::ProgressBar::new(mem / 100.0)
+                                    .desired_width(120.0)
+                                    .fill(egui::Color32::from_rgb(100, 100, 255)),
+                            );
+
+                            ui.add_space(8.0);
+                            ui.label(format!(
+                                "PROCS: {}",
+                                self.system_stats.system.processes().len()
+                            ));
+                            ui.label(format!("UPTIME: {}", self.system_stats.uptime()));
+                            ui.add_space(10.0);
+                        });
+                });
+
+                columns[1].vertical(|ui| {
+                    ui.add_space(10.0);
+
+                    let neon_cyan = egui::Color32::from_rgb(0, 255, 200);
+                    let neon_orange = egui::Color32::from_rgb(255, 150, 0);
+                    let neon_green = egui::Color32::from_rgb(0, 200, 100);
+                    let dark_bg = egui::Color32::from_rgb(15, 15, 30);
+
+                    egui::Frame::default()
+                        .fill(dark_bg)
+                        .stroke(egui::Stroke::new(2.0, neon_cyan))
+                        .corner_radius(8.0)
+                        .show(ui, |ui| {
+                            ui.add_space(10.0);
+                            ui.heading("REAL-TIME METRICS");
+                            ui.colored_label(egui::Color32::GRAY, self.current_time.clone());
+                            ui.separator();
+                            ui.add_space(10.0);
+
+                            ui.colored_label(neon_cyan, "CPU LOAD");
+                            let cpu_data = self.realtime_graphs.cpu.get_normalized();
+                            for val in cpu_data.iter().take(25) {
+                                let bar_height = (val * 15.0) as usize;
+                                let color = if *val > 0.8 {
+                                    egui::Color32::RED
+                                } else if *val > 0.5 {
+                                    egui::Color32::YELLOW
+                                } else {
+                                    egui::Color32::from_rgb(0, 255, 200)
+                                };
+                                ui.colored_label(color, "█".repeat(bar_height + 1));
                             }
+                            ui.colored_label(
+                                egui::Color32::GOLD,
+                                format!("{:.1}%", self.jarvis.processing_load),
+                            );
+
+                            ui.add_space(15.0);
+
+                            ui.colored_label(neon_green, "MEMORY USAGE");
+                            let mem_data = self.realtime_graphs.memory.get_normalized();
+                            for val in mem_data.iter().take(25) {
+                                let bar_height = (val * 15.0) as usize;
+                                let color = if *val > 0.9 {
+                                    egui::Color32::RED
+                                } else if *val > 0.7 {
+                                    egui::Color32::YELLOW
+                                } else {
+                                    egui::Color32::from_rgb(100, 200, 255)
+                                };
+                                ui.colored_label(color, "█".repeat(bar_height + 1));
+                            }
+                            ui.colored_label(
+                                egui::Color32::GOLD,
+                                format!("{:.1}%", self.jarvis.memory_usage),
+                            );
+
+                            ui.add_space(15.0);
+
+                            ui.colored_label(neon_orange, "NETWORK ACTIVITY");
+                            let net_data = self.realtime_graphs.network.get_normalized();
+                            for val in net_data.iter().take(25) {
+                                let bar_height = (val * 15.0) as usize;
+                                ui.colored_label(
+                                    egui::Color32::from_rgb(255, 100, 50),
+                                    "█".repeat(bar_height + 1),
+                                );
+                            }
+                            ui.colored_label(
+                                egui::Color32::GOLD,
+                                format!("{:.1}%", self.jarvis.network_activity),
+                            );
+
+                            ui.add_space(15.0);
+
+                            ui.colored_label(
+                                egui::Color32::from_rgb(255, 200, 50),
+                                "POWER CONSUMPTION",
+                            );
+                            let power_data = self.realtime_graphs.power.get_normalized();
+                            for val in power_data.iter().take(25) {
+                                let bar_height = (val * 15.0) as usize;
+                                ui.colored_label(
+                                    egui::Color32::from_rgb(255, 200, 0),
+                                    "█".repeat(bar_height + 1),
+                                );
+                            }
+                            ui.colored_label(
+                                egui::Color32::GOLD,
+                                format!("{:.1}%", self.jarvis.power_consumption),
+                            );
+
+                            ui.add_space(15.0);
+
+                            ui.colored_label(egui::Color32::from_rgb(200, 100, 255), "CORE TEMP");
+                            ui.add(
+                                egui::ProgressBar::new(self.jarvis.core_temp / 100.0)
+                                    .desired_width(200.0)
+                                    .fill(egui::Color32::from_rgb(200, 100, 255)),
+                            );
+                            ui.colored_label(
+                                egui::Color32::GOLD,
+                                format!("{:.1}C", self.jarvis.core_temp),
+                            );
+
+                            ui.add_space(10.0);
+                        });
+                });
+
+                columns[2].vertical(|ui| {
+                    ui.add_space(10.0);
+
+                    let neon_cyan = egui::Color32::from_rgb(0, 255, 200);
+                    let neon_pink = egui::Color32::from_rgb(255, 0, 128);
+                    let dark_bg = egui::Color32::from_rgb(15, 15, 30);
+
+                    egui::Frame::default()
+                        .fill(dark_bg)
+                        .stroke(egui::Stroke::new(2.0, neon_pink))
+                        .corner_radius(8.0)
+                        .show(ui, |ui| {
+                            ui.add_space(10.0);
+                            ui.heading("JARVIS CORE");
+                            ui.separator();
+                            ui.add_space(10.0);
+
+                            ui.colored_label(neon_cyan, "* JARVIS ACTIVE *");
+                            ui.add_space(8.0);
+
+                            let mode_color = match self.jarvis.system_mode.as_str() {
+                                "STANDBY" => egui::Color32::GRAY,
+                                "ACTIVE" => neon_cyan,
+                                "HIGH ALERT" => egui::Color32::RED,
+                                _ => egui::Color32::WHITE,
+                            };
+                            ui.colored_label(
+                                mode_color,
+                                format!("MODE: {}", self.jarvis.system_mode),
+                            );
+
+                            let threat_color = match self.jarvis.threat_level.as_str() {
+                                "LOW" => neon_cyan,
+                                "MEDIUM" => egui::Color32::YELLOW,
+                                "HIGH" => egui::Color32::RED,
+                                _ => egui::Color32::WHITE,
+                            };
+                            ui.colored_label(
+                                threat_color,
+                                format!("THREAT: {}", self.jarvis.threat_level),
+                            );
+
+                            ui.colored_label(
+                                egui::Color32::from_rgb(0, 200, 100),
+                                format!("SECURITY: {}", self.jarvis.security_status),
+                            );
+
+                            ui.separator();
+                            ui.add_space(10.0);
+
+                            ui.colored_label(egui::Color32::GOLD, "SYSTEM HEALTH");
+                            ui.add_space(5.0);
+
+                            ui.label("Processing:");
+                            ui.add(
+                                egui::ProgressBar::new(self.jarvis.processing_load / 100.0)
+                                    .desired_width(150.0)
+                                    .fill(neon_cyan),
+                            );
+
+                            ui.add_space(8.0);
+                            ui.label("Memory:");
+                            ui.add(
+                                egui::ProgressBar::new(self.jarvis.memory_usage / 100.0)
+                                    .desired_width(150.0)
+                                    .fill(egui::Color32::from_rgb(100, 100, 255)),
+                            );
+
+                            ui.add_space(8.0);
+                            ui.label("Connections:");
+                            ui.colored_label(
+                                egui::Color32::from_rgb(150, 150, 255),
+                                format!("{}", self.jarvis.active_connections),
+                            );
+
+                            ui.separator();
+                            ui.add_space(10.0);
+
+                            ui.colored_label(
+                                egui::Color32::from_rgb(255, 100, 100),
+                                "AI ENGINE STATUS",
+                            );
+                            let ai_online = self.ollama.is_available();
+                            ui.colored_label(
+                                if ai_online {
+                                    egui::Color32::from_rgb(0, 255, 100)
+                                } else {
+                                    egui::Color32::RED
+                                },
+                                if ai_online {
+                                    ">>> ONLINE <<<"
+                                } else {
+                                    "--- OFFLINE ---"
+                                },
+                            );
+                            if ai_online {
+                                ui.label(format!("Model: {}", self.ollama.config().model));
+                            }
+
+                            ui.separator();
+                            ui.add_space(10.0);
+
+                            ui.colored_label(egui::Color32::YELLOW, "ACTIVE ALERTS");
+                            ui.add_space(5.0);
+                            if self.alert_manager.alerts.is_empty() {
+                                ui.colored_label(egui::Color32::GRAY, "No alerts");
+                            } else {
+                                for alert in self.alert_manager.alerts.iter().take(3) {
+                                    let color = match alert.level {
+                                        ui::AlertLevel::Critical => egui::Color32::RED,
+                                        ui::AlertLevel::Warning => egui::Color32::YELLOW,
+                                        ui::AlertLevel::Info => egui::Color32::LIGHT_BLUE,
+                                    };
+                                    ui.colored_label(color, &alert.message);
+                                }
+                            }
+
+                            ui.add_space(10.0);
+                        });
+                });
+
+                columns[3].vertical(|ui| {
+                    ui.add_space(10.0);
+
+                    let neon_cyan = egui::Color32::from_rgb(0, 255, 200);
+                    let dark_bg = egui::Color32::from_rgb(15, 15, 30);
+
+                    egui::Frame::default()
+                        .fill(dark_bg)
+                        .stroke(egui::Stroke::new(2.0, neon_cyan))
+                        .corner_radius(8.0)
+                        .show(ui, |ui| {
+                            ui.add_space(10.0);
+                            ui.heading("COMMAND CONSOLE");
+                            ui.colored_label(egui::Color32::GRAY, "Type 'help' for commands");
+                            ui.separator();
+                            ui.add_space(10.0);
+
+                            ui.horizontal(|ui| {
+                                ui.colored_label(neon_cyan, ">");
+                                ui.text_edit_singleline(&mut self.command_input.current);
+                            });
+
+                            if ui.input(|i| i.key_pressed(egui::Key::Enter)) {
+                                let cmd = self.command_input.current.clone();
+                                if !cmd.is_empty() {
+                                    self.command_input.push_command(cmd.clone());
+                                    self.execute_command(&cmd);
+                                    self.command_input.current.clear();
+                                }
+                            }
+
+                            if ui.input(|i| i.key_pressed(egui::Key::ArrowUp)) {
+                                self.command_input.navigate_history_up();
+                            }
+                            if ui.input(|i| i.key_pressed(egui::Key::ArrowDown)) {
+                                self.command_input.navigate_history_down();
+                            }
+
+                            ui.add_space(10.0);
+                            let btn_text = if self.is_processing {
+                                ">>> PROCESSING <<<"
+                            } else {
+                                "EXECUTE"
+                            };
+                            let btn_color = if self.is_processing {
+                                egui::Color32::YELLOW
+                            } else {
+                                neon_cyan
+                            };
+                            if ui.button(btn_text).clicked() {
+                                let cmd = self.command_input.current.clone();
+                                if !cmd.is_empty() {
+                                    self.command_input.push_command(cmd.clone());
+                                    self.execute_command(&cmd);
+                                    self.command_input.current.clear();
+                                }
+                            }
+
+                            ui.separator();
+                            ui.add_space(5.0);
+                            ui.colored_label(egui::Color32::GRAY, "OUTPUT TERMINAL");
+
+                            egui::ScrollArea::vertical()
+                                .stick_to_bottom(true)
+                                .show(ui, |ui| {
+                                    for msg in self.output_messages.iter().rev().take(30).rev() {
+                                        ui.label(msg);
+                                    }
+                                });
+
+                            ui.add_space(10.0);
                         });
                 });
             });

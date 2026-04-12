@@ -8,11 +8,13 @@ pub enum Theme {
     Cyberpunk,
     Ocean,
     Forest,
+    Neon,
+    Matrix,
 }
 
 impl Default for Theme {
     fn default() -> Self {
-        Theme::Dark
+        Theme::Neon
     }
 }
 
@@ -24,6 +26,8 @@ impl Theme {
             Theme::Cyberpunk,
             Theme::Ocean,
             Theme::Forest,
+            Theme::Neon,
+            Theme::Matrix,
         ]
     }
 
@@ -34,6 +38,8 @@ impl Theme {
             Theme::Cyberpunk => "Cyberpunk",
             Theme::Ocean => "Ocean",
             Theme::Forest => "Forest",
+            Theme::Neon => "Neon",
+            Theme::Matrix => "Matrix",
         }
     }
 
@@ -54,6 +60,16 @@ impl Theme {
             Theme::Forest => {
                 let mut visuals = egui::Visuals::dark();
                 visuals_override_forest(&mut visuals);
+                visuals
+            }
+            Theme::Neon => {
+                let mut visuals = egui::Visuals::dark();
+                visuals_override_neon(&mut visuals);
+                visuals
+            }
+            Theme::Matrix => {
+                let mut visuals = egui::Visuals::dark();
+                visuals_override_matrix(&mut visuals);
                 visuals
             }
         };
@@ -91,6 +107,31 @@ fn visuals_override_forest(visuals: &mut egui::Visuals) {
     visuals.selection.stroke = egui::Stroke::new(1.0, egui::Color32::from_rgb(100, 200, 100));
 }
 
+fn visuals_override_neon(visuals: &mut egui::Visuals) {
+    visuals.panel_fill = egui::Color32::from_rgb(10, 10, 20);
+    visuals.widgets.noninteractive.bg_fill = egui::Color32::from_rgb(15, 15, 30);
+    visuals.widgets.noninteractive.bg_stroke =
+        egui::Stroke::new(1.5, egui::Color32::from_rgb(0, 255, 200));
+    visuals.widgets.hovered.bg_fill = egui::Color32::from_rgb(0, 60, 50);
+    visuals.widgets.active.bg_fill = egui::Color32::from_rgb(0, 100, 80);
+    visuals.selection.bg_fill = egui::Color32::from_rgb(0, 255, 200);
+    visuals.selection.stroke = egui::Stroke::new(2.0, egui::Color32::from_rgb(0, 255, 255));
+    visuals.faint_bg_color = egui::Color32::from_rgb(20, 20, 40);
+    visuals.override_text_color = Some(egui::Color32::from_rgb(200, 255, 230));
+}
+
+fn visuals_override_matrix(visuals: &mut egui::Visuals) {
+    visuals.panel_fill = egui::Color32::from_rgb(0, 10, 0);
+    visuals.widgets.noninteractive.bg_fill = egui::Color32::from_rgb(0, 20, 0);
+    visuals.widgets.noninteractive.bg_stroke =
+        egui::Stroke::new(1.0, egui::Color32::from_rgb(0, 200, 0));
+    visuals.widgets.hovered.bg_fill = egui::Color32::from_rgb(0, 40, 0);
+    visuals.widgets.active.bg_fill = egui::Color32::from_rgb(0, 60, 0);
+    visuals.selection.bg_fill = egui::Color32::from_rgb(0, 180, 0);
+    visuals.selection.stroke = egui::Stroke::new(1.5, egui::Color32::from_rgb(100, 255, 100));
+    visuals.override_text_color = Some(egui::Color32::from_rgb(150, 255, 150));
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UiState {
     pub theme: Theme,
@@ -98,16 +139,20 @@ pub struct UiState {
     pub panel_widths: [f32; 3],
     pub output_wrap: bool,
     pub timestamp_format: bool,
+    pub animations_enabled: bool,
+    pub glow_effects: bool,
 }
 
 impl Default for UiState {
     fn default() -> Self {
         Self {
-            theme: Theme::Dark,
+            theme: Theme::Neon,
             show_shortcuts: false,
             panel_widths: [150.0, 400.0, 200.0],
             output_wrap: true,
             timestamp_format: true,
+            animations_enabled: true,
+            glow_effects: true,
         }
     }
 }
