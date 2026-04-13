@@ -7,7 +7,7 @@ mod plugins;
 mod system;
 mod ui;
 
-use ai::{AiProvider, OllamaClient};
+use ai::{AiProvider, HolographicAI, OllamaClient};
 use commands::{parse_file_command, parse_network_command, parse_system_command};
 use commands::{AliasManager, Calculator, CommandInput, EnvManager, NotesManager, TodoManager};
 use config::AppConfig;
@@ -24,6 +24,7 @@ pub struct HeliosApp {
     command_input: CommandInput,
     output_messages: Vec<String>,
     ollama: OllamaClient,
+    holographic_ai: HolographicAI,
     system_stats: SystemStats,
     is_processing: bool,
     selected_category: usize,
@@ -40,6 +41,8 @@ pub struct HeliosApp {
     jarvis: JarviState,
     realtime_graphs: RealtimeGraph,
     alert_manager: AlertManager,
+    ai_chat_mode: bool,
+    current_ai_prompt: String,
 }
 
 impl Default for HeliosApp {
@@ -54,6 +57,7 @@ impl Default for HeliosApp {
         let jarvis = JarviState::new();
         let realtime_graphs = RealtimeGraph::new();
         let alert_manager = AlertManager::new();
+        let holographic_ai = HolographicAI::new();
 
         let _ = plugin_registry.register(Box::new(FileManagerPlugin::new()));
         let _ = plugin_registry.register(Box::new(NetworkToolsPlugin::new()));
@@ -62,10 +66,12 @@ impl Default for HeliosApp {
         Self {
             command_input: CommandInput::default(),
             output_messages: vec![
-                "HELIOS v0.2.0 Advanced Command System".to_string(),
+                "HELIOS v0.7.0 Advanced AI Command System".to_string(),
                 "Type 'help' for command reference".to_string(),
+                "Use 'ai chat' for holographic AI mode".to_string(),
             ],
             ollama: OllamaClient::default(),
+            holographic_ai,
             system_stats: SystemStats::new(),
             is_processing: false,
             selected_category: 0,
@@ -82,6 +88,8 @@ impl Default for HeliosApp {
             jarvis,
             realtime_graphs,
             alert_manager,
+            ai_chat_mode: false,
+            current_ai_prompt: String::new(),
         }
     }
 }
@@ -89,6 +97,7 @@ impl Default for HeliosApp {
 impl HeliosApp {
     fn update_time(&mut self) {
         self.jarvis.update();
+        self.holographic_ai.update();
 
         // Update realtime graphs
         self.realtime_graphs.update(
@@ -263,48 +272,84 @@ impl HeliosApp {
                 let args: Vec<&str> = parts[1..].iter().copied().collect();
                 if args.is_empty() {
                     self.output_messages
-                        .push("Usage: ai <prompt> | ai config <key> <value>".to_string());
+                        .push("=== HOLOGRAPHIC AI SYSTEM ===".to_string());
+                    self.output_messages.push(format!(
+                        "Status: {}",
+                        self.holographic_ai.get_status_indicator()
+                    ));
+                    self.output_messages
+                        .push(format!("Emotion: {}", self.holographic_ai.emotion_state));
+                    self.output_messages.push(format!(
+                        "Processing Speed: {:.0}%",
+                        self.holographic_ai.processing_speed
+                    ));
+                    self.output_messages.push(format!(
+                        "Neural Links: {}",
+                        self.holographic_ai.neural_links
+                    ));
+                    self.output_messages.push(format!(
+                        "Quantum State: {}",
+                        self.holographic_ai.quantum_state
+                    ));
+                    self.output_messages.push("".to_string());
+                    self.output_messages
+                        .push("Usage: ai <prompt> | ai <subcommand>".to_string());
                     self.output_messages
                         .push("  ai <prompt> - Ask AI".to_string());
                     self.output_messages
-                        .push("  ai chat - Start chat mode".to_string());
+                        .push("  ai chat - Toggle chat mode".to_string());
                     self.output_messages
                         .push("  ai clear - Clear chat history".to_string());
                     self.output_messages
                         .push("  ai history - Show chat history".to_string());
                     self.output_messages
                         .push("  ai config - Show AI config".to_string());
-                    self.output_messages.push(
-                        "  ai provider <name> - Set provider (ollama/openai/anthropic)".to_string(),
-                    );
+                    self.output_messages
+                        .push("  ai provider <name> - Set provider".to_string());
                     self.output_messages
                         .push("  ai model <name> - Set model".to_string());
+                    self.output_messages
+                        .push("  ai emotion <state> - Set AI emotion".to_string());
+                    self.output_messages
+                        .push("  ai voice on/off - Toggle voice".to_string());
                 } else if args[0] == "config" {
                     self.output_messages
                         .push(format!("AI Config: {:?}", self.ollama.config()));
                 } else if args[0] == "provider" {
                     if args.len() < 2 {
-                        self.output_messages
-                            .push("Usage: ai provider <ollama|openai|anthropic>".to_string());
+                        self.output_messages.push(
+                            "Usage: ai provider <ollama|openai|anthropic|claude|gemini|deepseek>"
+                                .to_string(),
+                        );
                     } else {
                         match args[1].to_lowercase().as_str() {
                             "ollama" => {
                                 self.ollama.set_provider(AiProvider::Ollama);
                                 self.output_messages
-                                    .push("Provider set to Ollama".to_string());
+                                    .push("Provider set to OLLAMA".to_string());
                             }
                             "openai" => {
                                 self.ollama.set_provider(AiProvider::OpenAI);
                                 self.output_messages
-                                    .push("Provider set to OpenAI".to_string());
+                                    .push("Provider set to OPENAI".to_string());
                             }
-                            "anthropic" => {
+                            "anthropic" | "claude" => {
                                 self.ollama.set_provider(AiProvider::Anthropic);
                                 self.output_messages
-                                    .push("Provider set to Anthropic".to_string());
+                                    .push("Provider set to ANTHROPIC".to_string());
+                            }
+                            "gemini" => {
+                                self.ollama.set_provider(AiProvider::Gemini);
+                                self.output_messages
+                                    .push("Provider set to GEMINI".to_string());
+                            }
+                            "deepseek" => {
+                                self.ollama.set_provider(AiProvider::DeepSeek);
+                                self.output_messages
+                                    .push("Provider set to DEEPSEEK".to_string());
                             }
                             _ => self.output_messages.push(
-                                "Unknown provider. Use: ollama, openai, or anthropic".to_string(),
+                                "Unknown provider. Use: ollama, openai, anthropic, claude, gemini, deepseek".to_string(),
                             ),
                         }
                     }
@@ -312,6 +357,8 @@ impl HeliosApp {
                     if args.len() < 2 {
                         self.output_messages
                             .push("Usage: ai model <model_name>".to_string());
+                        self.output_messages
+                            .push("Available: llama2, llama3, mistral, codellama, gpt-3.5, gpt-4, claude-3, gemini-pro, deepseek-chat".to_string());
                     } else {
                         self.ollama.set_model(args[1].to_string());
                         self.output_messages
@@ -326,10 +373,40 @@ impl HeliosApp {
                         self.output_messages.push("API key set".to_string());
                     }
                 } else if args[0] == "chat" {
-                    self.output_messages.push(
-                        "Chat mode not yet implemented. Use 'ai <prompt>' for single queries."
-                            .to_string(),
-                    );
+                    self.ai_chat_mode = !self.ai_chat_mode;
+                    if self.ai_chat_mode {
+                        self.output_messages
+                            .push(">>> HOLOGRAPHIC CHAT MODE ACTIVATED <<<".to_string());
+                        self.output_messages
+                            .push("Type your message and press Enter to chat with AI".to_string());
+                    } else {
+                        self.output_messages
+                            .push("Holographic chat mode deactivated".to_string());
+                    }
+                } else if args[0] == "emotion" {
+                    if args.len() < 2 {
+                        self.output_messages.push(
+                            "Usage: ai emotion <calm|happy|focused|alert|thinking>".to_string(),
+                        );
+                    } else {
+                        let emotion = args[1].to_uppercase();
+                        self.holographic_ai.set_emotion(&emotion);
+                        self.output_messages
+                            .push(format!("AI emotion set to: {}", emotion));
+                    }
+                } else if args[0] == "voice" {
+                    if args.len() < 2 {
+                        self.output_messages
+                            .push("Usage: ai voice <on|off>".to_string());
+                    } else if args[1] == "on" {
+                        self.holographic_ai.activate_voice();
+                        self.output_messages
+                            .push("Voice synthesis activated".to_string());
+                    } else if args[1] == "off" {
+                        self.holographic_ai.deactivate_voice();
+                        self.output_messages
+                            .push("Voice synthesis deactivated".to_string());
+                    }
                 } else if args[0] == "clear" {
                     self.ollama.clear_history();
                     self.output_messages
@@ -351,7 +428,7 @@ impl HeliosApp {
                     self.is_processing = true;
                     match self.ollama.generate(prompt) {
                         Ok(response) => {
-                            self.output_messages.push("AI:".to_string());
+                            self.output_messages.push("HOLOGRAPHIC AI:".to_string());
                             self.output_messages.push(response);
                         }
                         Err(e) => {
