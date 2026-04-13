@@ -1,6 +1,6 @@
 pub mod client;
 
-pub use client::{AiClient, AiModel, AiProvider, ChatMessage};
+pub use client::AiClient;
 
 pub type OllamaClient = AiClient;
 

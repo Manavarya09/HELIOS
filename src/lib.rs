@@ -847,7 +847,7 @@ impl HeliosApp {
                         }
                     }
                 } else if args[0] == "stat" {
-                    let (total, has_most_used, names) = self.alias_manager.get_stats();
+                    let (total, _has_most_used, names) = self.alias_manager.get_stats();
                     self.output_messages.push("Alias Statistics:".to_string());
                     self.output_messages
                         .push(format!("  Total aliases: {}", total));
