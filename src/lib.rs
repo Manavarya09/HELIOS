@@ -1901,7 +1901,7 @@ impl eframe::App for HeliosApp {
                             } else {
                                 "EXECUTE"
                             };
-                            let btn_color = if self.is_processing {
+                            let _btn_color = if self.is_processing {
                                 egui::Color32::YELLOW
                             } else {
                                 neon_cyan
