@@ -9,7 +9,7 @@ pub mod system_cmds;
 pub mod todo;
 pub mod voice;
 
-pub use alias::{Alias, AliasManager};
+pub use alias::AliasManager;
 pub use calculator::Calculator;
 pub use env::EnvManager;
 pub use file_ops::parse_file_command;
