@@ -1,4 +1,5 @@
 mod ai;
+mod automation;
 mod commands;
 mod config;
 mod jarvis;
@@ -9,6 +10,7 @@ mod system;
 mod ui;
 
 use ai::{AiProvider, HolographicAI, OllamaClient};
+use automation::{MacroAction, MacroSystem, ScheduleType, TaskScheduler};
 use commands::{parse_file_command, parse_network_command, parse_system_command};
 use commands::{
     AliasManager, Calculator, CommandInput, EnvManager, NotesManager, TodoManager, VoiceSystem,
@@ -46,6 +48,8 @@ pub struct HeliosApp {
     voice_system: VoiceSystem,
     encryption: EncryptionSystem,
     security_scanner: SecurityScanner,
+    scheduler: TaskScheduler,
+    macros: MacroSystem,
     ai_chat_mode: bool,
     current_ai_prompt: String,
 }
@@ -96,6 +100,8 @@ impl Default for HeliosApp {
             voice_system: VoiceSystem::new(),
             encryption: EncryptionSystem::new(),
             security_scanner: SecurityScanner::new(),
+            scheduler: TaskScheduler::new(),
+            macros: MacroSystem::new(),
             ai_chat_mode: false,
             current_ai_prompt: String::new(),
         }
@@ -1372,6 +1378,84 @@ impl HeliosApp {
                 } else {
                     self.output_messages
                         .push("Usage: scan [status|start|list]".to_string());
+                }
+            }
+            Some(&"task") | Some(&"schedule") => {
+                let args: Vec<&str> = parts[1..].iter().copied().collect();
+
+                if args.is_empty() || args[0] == "status" {
+                    self.output_messages
+                        .push("=== TASK SCHEDULER ===".to_string());
+                    self.output_messages.push(self.scheduler.get_summary());
+                } else if args[0] == "list" {
+                    self.output_messages.push("Scheduled Tasks:".to_string());
+                    for task in self.scheduler.list_tasks() {
+                        let status = if task.enabled {
+                            "[ENABLED]"
+                        } else {
+                            "[DISABLED]"
+                        };
+                        self.output_messages.push(format!(
+                            "{} {} - {} (every {}s)",
+                            status, task.id, task.name, task.interval_seconds
+                        ));
+                    }
+                } else if args[0] == "add" && args.len() > 3 {
+                    let name = args[1].to_string();
+                    let command = args[2].to_string();
+                    let interval: u64 = args.get(3).and_then(|s| s.parse().ok()).unwrap_or(60);
+                    let id =
+                        self.scheduler
+                            .add_task(name, command, ScheduleType::Interval, interval);
+                    self.output_messages.push(format!("Task created: {}", id));
+                } else if args[0] == "enable" && args.len() > 1 {
+                    if self.scheduler.enable_task(args[1]) {
+                        self.output_messages
+                            .push(format!("Task {} enabled", args[1]));
+                    } else {
+                        self.output_messages.push("Task not found".to_string());
+                    }
+                } else if args[0] == "disable" && args.len() > 1 {
+                    if self.scheduler.disable_task(args[1]) {
+                        self.output_messages
+                            .push(format!("Task {} disabled", args[1]));
+                    } else {
+                        self.output_messages.push("Task not found".to_string());
+                    }
+                } else {
+                    self.output_messages.push("Usage: task [status|list|add <name> <cmd> <interval>|enable <id>|disable <id>]".to_string());
+                }
+            }
+            Some(&"macro") => {
+                let args: Vec<&str> = parts[1..].iter().copied().collect();
+
+                if args.is_empty() || args[0] == "status" {
+                    self.output_messages
+                        .push("=== MACRO SYSTEM ===".to_string());
+                    self.output_messages.push(self.macros.get_summary());
+                } else if args[0] == "list" {
+                    self.output_messages.push("Macros:".to_string());
+                    for m in &self.macros.macros {
+                        let status = if m.enabled { "[ENABLED]" } else { "[DISABLED]" };
+                        self.output_messages
+                            .push(format!("{} {} - Trigger: {}", status, m.name, m.trigger));
+                    }
+                } else if args[0] == "add" && args.len() > 2 {
+                    let name = args[1].to_string();
+                    let trigger = args[2].to_string();
+                    let id = self.macros.create_macro(name, trigger);
+                    self.output_messages.push(format!("Macro created: {}", id));
+                } else if args[0] == "delete" && args.len() > 1 {
+                    if self.macros.delete_macro(args[1]) {
+                        self.output_messages
+                            .push(format!("Macro {} deleted", args[1]));
+                    } else {
+                        self.output_messages.push("Macro not found".to_string());
+                    }
+                } else {
+                    self.output_messages.push(
+                        "Usage: macro [status|list|add <name> <trigger>|delete <id>]".to_string(),
+                    );
                 }
             }
             _ => {
