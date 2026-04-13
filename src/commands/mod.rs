@@ -7,6 +7,7 @@ pub mod network;
 pub mod notes;
 pub mod system_cmds;
 pub mod todo;
+pub mod voice;
 
 pub use alias::{Alias, AliasManager};
 pub use calculator::Calculator;
@@ -17,3 +18,4 @@ pub use network::parse_network_command;
 pub use notes::{Note, NotesManager};
 pub use system_cmds::parse_system_command;
 pub use todo::{TodoItem, TodoManager};
+pub use voice::{VoiceConfig, VoiceMode, VoiceSystem};

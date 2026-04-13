@@ -9,7 +9,9 @@ mod ui;
 
 use ai::{AiProvider, HolographicAI, OllamaClient};
 use commands::{parse_file_command, parse_network_command, parse_system_command};
-use commands::{AliasManager, Calculator, CommandInput, EnvManager, NotesManager, TodoManager};
+use commands::{
+    AliasManager, Calculator, CommandInput, EnvManager, NotesManager, TodoManager, VoiceSystem,
+};
 use config::AppConfig;
 use eframe::egui;
 use jarvis::JarviState;
@@ -41,6 +43,7 @@ pub struct HeliosApp {
     jarvis: JarviState,
     realtime_graphs: RealtimeGraph,
     alert_manager: AlertManager,
+    voice_system: VoiceSystem,
     ai_chat_mode: bool,
     current_ai_prompt: String,
 }
@@ -88,6 +91,7 @@ impl Default for HeliosApp {
             jarvis,
             realtime_graphs,
             alert_manager,
+            voice_system: VoiceSystem::new(),
             ai_chat_mode: false,
             current_ai_prompt: String::new(),
         }
@@ -1209,6 +1213,92 @@ impl HeliosApp {
                     }
                 } else {
                     self.output_messages.push("Usage: todo [list|add <title> [priority]|done <id>|undo <id>|delete <id>|clear|pending]".to_string());
+                }
+            }
+            Some(&"voice") | Some(&"speak") => {
+                let args: Vec<&str> = parts[1..].iter().copied().collect();
+
+                if args.is_empty() || args[0] == "status" {
+                    self.output_messages
+                        .push("=== VOICE SYSTEM ===".to_string());
+                    self.output_messages
+                        .push(format!("Status: {}", self.voice_system.get_status()));
+                    self.output_messages.push(format!(
+                        "TTS: {}",
+                        if self.voice_system.config.tts_enabled {
+                            "Enabled"
+                        } else {
+                            "Disabled"
+                        }
+                    ));
+                    self.output_messages.push(format!(
+                        "STT: {}",
+                        if self.voice_system.config.stt_enabled {
+                            "Enabled"
+                        } else {
+                            "Disabled"
+                        }
+                    ));
+                    self.output_messages
+                        .push(format!("Rate: {:.1}x", self.voice_system.config.voice_rate));
+                    self.output_messages.push(format!(
+                        "Volume: {:.0}%",
+                        self.voice_system.config.voice_volume * 100.0
+                    ));
+                    self.output_messages.push("".to_string());
+                    self.output_messages.push("Commands: voice on, voice off, voice tts on, voice stt on, voice rate <0.5-2.0>, voice volume <0-100>".to_string());
+                } else if args[0] == "on" {
+                    self.voice_system.config.enabled = true;
+                    self.output_messages
+                        .push("Voice system enabled".to_string());
+                } else if args[0] == "off" {
+                    self.voice_system.disable();
+                    self.output_messages
+                        .push("Voice system disabled".to_string());
+                } else if args[0] == "tts" && args.len() > 1 {
+                    if args[1] == "on" {
+                        self.voice_system.enable_tts();
+                        self.output_messages
+                            .push("Text-to-Speech enabled".to_string());
+                    } else if args[1] == "off" {
+                        self.voice_system.config.tts_enabled = false;
+                        self.output_messages
+                            .push("Text-to-Speech disabled".to_string());
+                    }
+                } else if args[0] == "stt" && args.len() > 1 {
+                    if args[1] == "on" {
+                        self.voice_system.enable_stt();
+                        self.output_messages
+                            .push("Speech-to-Text enabled".to_string());
+                    } else if args[1] == "off" {
+                        self.voice_system.config.stt_enabled = false;
+                        self.output_messages
+                            .push("Speech-to-Text disabled".to_string());
+                    }
+                } else if args[0] == "rate" && args.len() > 1 {
+                    if let Ok(rate) = args[1].parse::<f32>() {
+                        self.voice_system.set_rate(rate);
+                        self.output_messages
+                            .push(format!("Voice rate set to {:.1}x", rate));
+                    } else {
+                        self.output_messages
+                            .push("Invalid rate. Use: voice rate <0.5-2.0>".to_string());
+                    }
+                } else if args[0] == "volume" && args.len() > 1 {
+                    if let Ok(vol) = args[1].parse::<f32>() {
+                        self.voice_system.set_volume(vol / 100.0);
+                        self.output_messages
+                            .push(format!("Voice volume set to {:.0}%", vol));
+                    } else {
+                        self.output_messages
+                            .push("Invalid volume. Use: voice volume <0-100>".to_string());
+                    }
+                } else if args[0] == "say" {
+                    let text = args[1..].join(" ");
+                    self.voice_system.speak(&text);
+                    self.output_messages.push(format!("Speaking: {}", text));
+                } else {
+                    self.output_messages.push("Usage: voice [status|on|off|tts <on/off>|stt <on/off>|rate <val>|volume <val>|say <text>]".to_string());
                 }
             }
             _ => {
