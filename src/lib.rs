@@ -4,6 +4,7 @@ mod config;
 mod jarvis;
 mod output;
 mod plugins;
+mod security;
 mod system;
 mod ui;
 
@@ -17,6 +18,7 @@ use eframe::egui;
 use jarvis::JarviState;
 use output::OutputFormatter;
 use plugins::{FileManagerPlugin, NetworkToolsPlugin, PluginRegistry, ProcessManagerPlugin};
+use security::{EncryptionSystem, SecurityScanner, SeverityLevel};
 use system::SystemStats;
 use ui::{AlertManager, RealtimeGraph, Theme, UiState};
 
@@ -42,6 +44,8 @@ pub struct HeliosApp {
     realtime_graphs: RealtimeGraph,
     alert_manager: AlertManager,
     voice_system: VoiceSystem,
+    encryption: EncryptionSystem,
+    security_scanner: SecurityScanner,
     ai_chat_mode: bool,
     current_ai_prompt: String,
 }
@@ -90,6 +94,8 @@ impl Default for HeliosApp {
             realtime_graphs,
             alert_manager,
             voice_system: VoiceSystem::new(),
+            encryption: EncryptionSystem::new(),
+            security_scanner: SecurityScanner::new(),
             ai_chat_mode: false,
             current_ai_prompt: String::new(),
         }
@@ -1297,6 +1303,75 @@ impl HeliosApp {
                     self.output_messages.push(format!("Speaking: {}", text));
                 } else {
                     self.output_messages.push("Usage: voice [status|on|off|tts <on/off>|stt <on/off>|rate <val>|volume <val>|say <text>]".to_string());
+                }
+            }
+            Some(&"encrypt") | Some(&"crypto") => {
+                let args: Vec<&str> = parts[1..].iter().copied().collect();
+
+                if args.is_empty() || args[0] == "status" {
+                    self.output_messages
+                        .push("=== ENCRYPTION SYSTEM ===".to_string());
+                    self.output_messages.push(self.encryption.get_info());
+                } else if args[0] == "on" {
+                    self.encryption.enabled = true;
+                    self.output_messages.push("Encryption enabled".to_string());
+                } else if args[0] == "off" {
+                    self.encryption.enabled = false;
+                    self.output_messages.push("Encryption disabled".to_string());
+                } else if args[0] == "encrypt" && args.len() > 2 {
+                    let data = args[1];
+                    let key = args[2];
+                    match self.encryption.encrypt(data, key) {
+                        Ok(id) => self.output_messages.push(format!("Encrypted: {}", id)),
+                        Err(e) => self.output_messages.push(format!("Error: {}", e)),
+                    }
+                } else if args[0] == "decrypt" && args.len() > 2 {
+                    let id = args[1];
+                    let key = args[2];
+                    match self.encryption.decrypt(id, key) {
+                        Ok(data) => self.output_messages.push(format!("Decrypted: {}", data)),
+                        Err(e) => self.output_messages.push(format!("Error: {}", e)),
+                    }
+                } else if args[0] == "keys" {
+                    self.encryption.generate_keys();
+                    self.output_messages
+                        .push("Encryption keys generated".to_string());
+                } else {
+                    self.output_messages.push("Usage: encrypt [status|on|off|encrypt <data> <key>|decrypt <id> <key>|keys]".to_string());
+                }
+            }
+            Some(&"scan") | Some(&"security") => {
+                let args: Vec<&str> = parts[1..].iter().copied().collect();
+
+                if args.is_empty() || args[0] == "status" {
+                    self.output_messages
+                        .push("=== SECURITY SCANNER ===".to_string());
+                    self.output_messages
+                        .push(self.security_scanner.get_summary());
+                } else if args[0] == "start" || args[0] == "run" {
+                    self.security_scanner.start_scan();
+                    self.output_messages
+                        .push("Security scan started...".to_string());
+                    self.output_messages.push(format!(
+                        "Found {} issues",
+                        self.security_scanner.vulnerabilities.len()
+                    ));
+                } else if args[0] == "list" {
+                    self.output_messages.push("Vulnerabilities:".to_string());
+                    for vuln in &self.security_scanner.vulnerabilities {
+                        let severity = match vuln.severity {
+                            SeverityLevel::Critical => "[CRITICAL]",
+                            SeverityLevel::High => "[HIGH]",
+                            SeverityLevel::Medium => "[MEDIUM]",
+                            SeverityLevel::Low => "[LOW]",
+                            SeverityLevel::Info => "[INFO]",
+                        };
+                        self.output_messages
+                            .push(format!("{} {} - {}", severity, vuln.id, vuln.description));
+                    }
+                } else {
+                    self.output_messages
+                        .push("Usage: scan [status|start|list]".to_string());
                 }
             }
             _ => {
