@@ -1,18 +1,105 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub enum AiProvider {
     Ollama,
     OpenAI,
     Anthropic,
+    Claude,
+    Gemini,
+    DeepSeek,
+}
+
+impl Default for AiProvider {
+    fn default() -> Self {
+        AiProvider::Ollama
+    }
+}
+
+impl std::fmt::Display for AiProvider {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            AiProvider::Ollama => write!(f, "OLLAMA"),
+            AiProvider::OpenAI => write!(f, "OPENAI"),
+            AiProvider::Anthropic => write!(f, "ANTHROPIC"),
+            AiProvider::Claude => write!(f, "CLAUDE"),
+            AiProvider::Gemini => write!(f, "GEMINI"),
+            AiProvider::DeepSeek => write!(f, "DEEPSEEK"),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum AiModel {
+    Llama2,
+    Llama3,
+    Mistral,
+    Codellama,
+    Gpt35Turbo,
+    Gpt4,
+    Gpt4Turbo,
+    Claude2,
+    Claude3,
+    GeminiPro,
+    DeepSeekChat,
+}
+
+impl Default for AiModel {
+    fn default() -> Self {
+        AiModel::Llama2
+    }
+}
+
+impl AiModel {
+    pub fn name(&self) -> &'static str {
+        match self {
+            AiModel::Llama2 => "llama2",
+            AiModel::Llama3 => "llama3",
+            AiModel::Mistral => "mistral",
+            AiModel::Codellama => "codellama",
+            AiModel::Gpt35Turbo => "gpt-3.5-turbo",
+            AiModel::Gpt4 => "gpt-4",
+            AiModel::Gpt4Turbo => "gpt-4-turbo",
+            AiModel::Claude2 => "claude-2",
+            AiModel::Claude3 => "claude-3-opus",
+            AiModel::GeminiPro => "gemini-pro",
+            AiModel::DeepSeekChat => "deepseek-chat",
+        }
+    }
+
+    pub fn all() -> Vec<AiModel> {
+        vec![
+            AiModel::Llama2,
+            AiModel::Llama3,
+            AiModel::Mistral,
+            AiModel::Codellama,
+            AiModel::Gpt35Turbo,
+            AiModel::Gpt4,
+            AiModel::Gpt4Turbo,
+            AiModel::Claude2,
+            AiModel::Claude3,
+            AiModel::GeminiPro,
+            AiModel::DeepSeekChat,
+        ]
+    }
+}
+
+impl std::fmt::Display for AiModel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.name())
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AiConfig {
     pub provider: AiProvider,
+    pub model: AiModel,
     pub base_url: String,
-    pub model: String,
     pub api_key: Option<String>,
+    pub temperature: f32,
+    pub max_tokens: usize,
+    pub thinking_enabled: bool,
+    pub context_window: usize,
 }
 
 impl Default for AiConfig {
@@ -20,8 +107,12 @@ impl Default for AiConfig {
         Self {
             provider: AiProvider::Ollama,
             base_url: "http://localhost:11434".to_string(),
-            model: "llama2".to_string(),
+            model: AiModel::Llama2,
             api_key: None,
+            temperature: 0.7,
+            max_tokens: 2048,
+            thinking_enabled: false,
+            context_window: 4096,
         }
     }
 }
@@ -106,25 +197,47 @@ impl AiClient {
     }
 
     pub fn set_provider(&mut self, provider: AiProvider) {
-        self.config.provider = provider.clone();
-        match provider {
+        self.config.provider = provider;
+        match self.config.provider {
             AiProvider::Ollama => {
                 self.config.base_url = "http://localhost:11434".to_string();
-                self.config.model = "llama2".to_string();
+                self.config.model = AiModel::Llama2;
             }
             AiProvider::OpenAI => {
                 self.config.base_url = "https://api.openai.com/v1".to_string();
-                self.config.model = "gpt-3.5-turbo".to_string();
+                self.config.model = AiModel::Gpt35Turbo;
             }
-            AiProvider::Anthropic => {
+            AiProvider::Anthropic | AiProvider::Claude => {
                 self.config.base_url = "https://api.anthropic.com/v1".to_string();
-                self.config.model = "claude-3-haiku-20240307".to_string();
+                self.config.model = AiModel::Claude3;
+            }
+            AiProvider::Gemini => {
+                self.config.base_url = "https://generativelanguage.googleapis.com/v1".to_string();
+                self.config.model = AiModel::GeminiPro;
+            }
+            AiProvider::DeepSeek => {
+                self.config.base_url = "https://api.deepseek.com/v1".to_string();
+                self.config.model = AiModel::DeepSeekChat;
             }
         }
     }
 
     pub fn set_model(&mut self, model: String) {
-        self.config.model = model;
+        let ai_model = match model.to_lowercase().as_str() {
+            "llama2" => AiModel::Llama2,
+            "llama3" => AiModel::Llama3,
+            "mistral" => AiModel::Mistral,
+            "codellama" => AiModel::Codellama,
+            "gpt-3.5-turbo" | "gpt3.5" | "gpt-3.5" => AiModel::Gpt35Turbo,
+            "gpt-4" | "gpt4" => AiModel::Gpt4,
+            "gpt-4-turbo" | "gpt4turbo" => AiModel::Gpt4Turbo,
+            "claude-2" | "claude2" => AiModel::Claude2,
+            "claude-3" | "claude3" => AiModel::Claude3,
+            "gemini-pro" | "geminipro" => AiModel::GeminiPro,
+            "deepseek-chat" | "deepseek" => AiModel::DeepSeekChat,
+            _ => AiModel::Llama2,
+        };
+        self.config.model = ai_model;
     }
 
     pub fn set_api_key(&mut self, key: String) {
@@ -139,7 +252,9 @@ impl AiClient {
         match self.config.provider {
             AiProvider::Ollama => self.generate_ollama(prompt),
             AiProvider::OpenAI => self.generate_openai(prompt),
-            AiProvider::Anthropic => self.generate_anthropic(prompt),
+            AiProvider::Anthropic | AiProvider::Claude => self.generate_anthropic(prompt),
+            AiProvider::Gemini => self.generate_ollama(prompt), // Fallback
+            AiProvider::DeepSeek => self.generate_ollama(prompt), // Fallback
         }
     }
 
@@ -147,7 +262,7 @@ impl AiClient {
         let url = format!("{}/api/generate", self.config.base_url);
 
         let request = OllamaRequest {
-            model: self.config.model.clone(),
+            model: self.config.model.name().to_string(),
             prompt,
             stream: false,
         };
@@ -180,12 +295,12 @@ impl AiClient {
         let url = format!("{}/chat/completions", self.config.base_url);
 
         let request = OpenAIRequest {
-            model: self.config.model.clone(),
+            model: self.config.model.name().to_string(),
             messages: vec![OpenAIMessage {
                 role: "user".to_string(),
                 content: prompt,
             }],
-            temperature: 0.7,
+            temperature: self.config.temperature,
         };
 
         let response = self
@@ -222,8 +337,8 @@ impl AiClient {
         let url = format!("{}/messages", self.config.base_url);
 
         let body = serde_json::json!({
-            "model": self.config.model,
-            "max_tokens": 1024,
+            "model": self.config.model.name(),
+            "max_tokens": self.config.max_tokens,
             "messages": [{
                 "role": "user",
                 "content": prompt
